@@ -23,9 +23,6 @@ export class User extends Document {
   dob: Date;
 
   @Prop()
-  password?: string;
-
-  @Prop()
   isEmailVerified: boolean;
 
   @Prop()

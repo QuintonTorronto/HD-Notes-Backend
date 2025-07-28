@@ -54,15 +54,13 @@ export class AuthService {
     });
   }
 
-  async signup(email: string, password: string, name: string, dob: string) {
+  async signup(email: string, name: string, dob: string) {
     const existing = await this.userService.findByEmail(email);
     if (existing) throw new BadRequestException('Email already exists');
-    const hash = await bcrypt.hash(password, 10);
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const user = await this.userService.create({
       name,
       email,
-      password: hash,
       dob: new Date(dob),
       otp,
       otpExpiresAt: new Date(Date.now() + 5 * 60 * 1000),
@@ -71,14 +69,10 @@ export class AuthService {
     return { message: 'OTP sent to email' };
   }
 
-  async login(email: string, password: string) {
+  async login(email: string) {
     const user = await this.userService.findByEmail(email);
-    if (
-      !user ||
-      !user.password ||
-      !(await bcrypt.compare(password, user.password))
-    ) {
-      throw new BadRequestException('Invalid credentials');
+    if (!user) {
+      throw new BadRequestException('Email does not exist');
     }
     if (!user.isEmailVerified) {
       throw new BadRequestException('Email not verified');
@@ -87,23 +81,17 @@ export class AuthService {
     const { accessToken, refreshToken } = await this.generateTokens(user);
     return { accessToken, refreshToken };
   }
-  async sendOtpEmail(
-    to: string,
-    otp: string,
-    context: 'signup' | 'reset' | 'login',
-  ) {
+  async sendOtpEmail(to: string, otp: string, context: 'signup' | 'login') {
     const { EMAIL_USER, EMAIL_PASS } = process.env;
     if (!EMAIL_USER || !EMAIL_PASS) throw new Error('Missing email creds');
 
     const subjects = {
       signup: 'Email Verification Code',
-      reset: 'Password Reset Code',
       login: 'Login OTP Code',
     };
 
     const texts = {
       signup: `Verification code: ${otp}. Expires in 5 minutes.`,
-      reset: `Reset code: ${otp}. Expires in 5 minutes.`,
       login: `Login OTP: ${otp}. Expires in 5 minutes.`,
     };
 
@@ -188,36 +176,6 @@ export class AuthService {
     const { accessToken, refreshToken } = await this.generateTokens(user);
     this.setAuthCookies(res, refreshToken); // sets refresh token cookie
     return { accessToken };
-  }
-
-  async forgotPassword(email: string) {
-    const user = await this.userService.findByEmail(email);
-    if (!user) throw new BadRequestException('User not found');
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    user.otp = otp;
-    user.otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
-    await user.save();
-    await this.sendOtpEmail(email, otp, 'reset');
-    return { message: 'Password reset OTP sent' };
-  }
-
-  async resetPassword(email: string, otp: string, newPassword: string) {
-    const user = await this.userService.findByEmail(email);
-    if (
-      !user ||
-      user.otp !== otp ||
-      !user.otpExpiresAt ||
-      user.otpExpiresAt.getTime() < Date.now()
-    ) {
-      throw new BadRequestException('Invalid or expired OTP');
-    }
-
-    user.password = await bcrypt.hash(newPassword, 10);
-    user.otp = undefined;
-    user.otpExpiresAt = undefined;
-    await user.save();
-    return { message: 'Password reset successful' };
   }
 
   async googleLoginCallback(email: string, oauthId: string, res: Response) {

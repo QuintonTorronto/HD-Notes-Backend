@@ -23,17 +23,11 @@ export class AuthController {
     @Body()
     body: {
       email: string;
-      password: string;
       name: string;
       dob: string;
     },
   ) {
-    return this.authService.signup(
-      body.email,
-      body.password,
-      body.name,
-      body.dob,
-    );
+    return this.authService.signup(body.email, body.name, body.dob);
   }
 
   @Post('verify-otp')
@@ -66,12 +60,11 @@ export class AuthController {
 
   @Post('login')
   async login(
-    @Body() body: { email: string; password: string },
+    @Body() body: { email: string },
     @Res({ passthrough: true }) res: Response,
   ) {
     const { accessToken, refreshToken } = await this.authService.login(
       body.email,
-      body.password,
     );
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
@@ -141,22 +134,6 @@ export class AuthController {
       name: user.name,
       email: user.email,
     };
-  }
-
-  @Post('forgot-password')
-  forgotPassword(@Body() body: { email: string }) {
-    return this.authService.forgotPassword(body.email);
-  }
-
-  @Post('reset-password')
-  resetPassword(
-    @Body() body: { email: string; otp: string; newPassword: string },
-  ) {
-    return this.authService.resetPassword(
-      body.email,
-      body.otp,
-      body.newPassword,
-    );
   }
 
   @UseGuards(JwtAuthGuard)
